@@ -275,3 +275,213 @@ test('old locator error message', async ({ client, server }) => {
     },
   })).toContainTextContent('Ref not found');
 });
+
+test('browser_get_html_source', async ({ client, server }) => {
+  server.setContent('/', `
+    <html>
+      <head><title>Test Page</title></head>
+      <body>
+        <h1>Test Heading</h1>
+        <p>Test paragraph</p>
+      </body>
+    </html>
+  `, 'text/html');
+
+  await client.callTool({
+    name: 'browser_navigate',
+    arguments: { url: server.PREFIX },
+  });
+
+  const result = await client.callTool({
+    name: 'browser_get_html_source',
+    arguments: {},
+  });
+
+  expect(result).toContainTextContent('Test Heading');
+  expect(result).toContainTextContent('Test paragraph');
+  expect(result).toContainTextContent('<title>Test Page</title>');
+  expect(result).toContainTextContent('"totalLength"');
+  expect(result).toContainTextContent('"hasMore"');
+});
+
+test('browser_get_html_source with compression', async ({ client, server }) => {
+  server.setContent('/', `
+    <html>
+      <head>
+        <title>Test Page</title>
+      </head>
+      <body>
+        <h1>Test Heading</h1>
+        <p>Test paragraph</p>
+      </body>
+    </html>
+  `, 'text/html');
+
+  await client.callTool({
+    name: 'browser_navigate',
+    arguments: { url: server.PREFIX },
+  });
+
+  const result = await client.callTool({
+    name: 'browser_get_html_source',
+    arguments: { compress: true },
+  });
+
+  const parsed = JSON.parse((result.content as any)[0].text);
+  expect(parsed.content).not.toContain('\n');
+  expect(parsed.content).toContain('Test Heading');
+});
+
+test('browser_get_html_source with excludeTags', async ({ client, server }) => {
+  server.setContent('/', `
+    <html>
+      <head>
+        <title>Test Page</title>
+        <script>console.log('test');</script>
+      </head>
+      <body>
+        <h1>Test Heading</h1>
+        <script>alert('popup');</script>
+        <p>Test paragraph</p>
+      </body>
+    </html>
+  `, 'text/html');
+
+  await client.callTool({
+    name: 'browser_navigate',
+    arguments: { url: server.PREFIX },
+  });
+
+  const result = await client.callTool({
+    name: 'browser_get_html_source',
+    arguments: { excludeTags: ['script'] },
+  });
+
+  const parsed = JSON.parse((result.content as any)[0].text);
+  expect(parsed.content).not.toContain('console.log');
+  expect(parsed.content).not.toContain('alert');
+  expect(parsed.content).toContain('Test Heading');
+});
+
+test('browser_get_html_source with maxLength and offset', async ({ client, server }) => {
+  server.setContent('/', `
+    <html>
+      <head><title>Test Page</title></head>
+      <body>
+        <h1>This is a very long content that should be split into chunks</h1>
+        <p>More content here to make it longer</p>
+      </body>
+    </html>
+  `, 'text/html');
+
+  await client.callTool({
+    name: 'browser_navigate',
+    arguments: { url: server.PREFIX },
+  });
+
+  const result1 = await client.callTool({
+    name: 'browser_get_html_source',
+    arguments: { maxLength: 50 },
+  });
+
+  const parsed1 = JSON.parse((result1.content as any)[0].text);
+  expect(parsed1.actualLength).toBe(50);
+  expect(parsed1.hasMore).toBe(true);
+  expect(parsed1.actualOffset).toBe(0);
+
+  const result2 = await client.callTool({
+    name: 'browser_get_html_source',
+    arguments: { offset: 50, maxLength: 50 },
+  });
+
+  const parsed2 = JSON.parse((result2.content as any)[0].text);
+  expect(parsed2.actualOffset).toBe(50);
+  expect(parsed2.actualLength).toBe(50);
+});
+
+test('browser_get_html_source with preset minimal', async ({ client, server }) => {
+  server.setContent('/', `
+    <html>
+      <head>
+        <title>Test Page</title>
+        <script>console.log('test');</script>
+        <style>body { color: red; }</style>
+      </head>
+      <body>
+        <h1>Test Heading</h1>
+        <p>Test paragraph</p>
+      </body>
+    </html>
+  `, 'text/html');
+
+  await client.callTool({
+    name: 'browser_navigate',
+    arguments: { url: server.PREFIX },
+  });
+
+  const result = await client.callTool({
+    name: 'browser_get_html_source',
+    arguments: { preset: 'minimal' },
+  });
+
+  const parsed = JSON.parse((result.content as any)[0].text);
+  expect(parsed.content).not.toContain('console.log');
+  expect(parsed.content).not.toContain('color: red');
+  expect(parsed.content).not.toContain('\n');
+  expect(parsed.content).toContain('Test Heading');
+});
+
+test('browser_get_html_source with headOnly', async ({ client, server }) => {
+  server.setContent('/', `
+    <html>
+      <head><title>Test Page</title></head>
+      <body>
+        <h1>Test Heading</h1>
+        <p>Test paragraph</p>
+      </body>
+    </html>
+  `, 'text/html');
+
+  await client.callTool({
+    name: 'browser_navigate',
+    arguments: { url: server.PREFIX },
+  });
+
+  const result = await client.callTool({
+    name: 'browser_get_html_source',
+    arguments: { headOnly: true },
+  });
+
+  const parsed = JSON.parse((result.content as any)[0].text);
+  expect(parsed.content).toContain('<title>Test Page</title>');
+  expect(parsed.content).not.toContain('Test Heading');
+  expect(parsed.content).not.toContain('Test paragraph');
+});
+
+test('browser_get_html_source with selector', async ({ client, server }) => {
+  server.setContent('/', `
+    <html>
+      <head><title>Test Page</title></head>
+      <body>
+        <h1 class="main-title">Test Heading</h1>
+        <p>Test paragraph</p>
+        <div class="content">Target content</div>
+      </body>
+    </html>
+  `, 'text/html');
+
+  await client.callTool({
+    name: 'browser_navigate',
+    arguments: { url: server.PREFIX },
+  });
+
+  const result = await client.callTool({
+    name: 'browser_get_html_source',
+    arguments: { selector: '.content' },
+  });
+
+  const parsed = JSON.parse((result.content as any)[0].text);
+  expect(parsed.content).toContain('Target content');
+  expect(parsed.content).not.toContain('Test Heading');
+  expect(parsed.content).not.toContain('Test paragraph');
+});
