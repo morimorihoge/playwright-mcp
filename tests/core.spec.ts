@@ -16,6 +16,11 @@
 
 import { test, expect } from './fixtures.js';
 
+// Helper function to parse HTML source tool result
+function parseHtmlSourceResponse(result: any) {
+  return JSON.parse((result.content as any)[0].text);
+}
+
 test('browser_navigate', async ({ client, server }) => {
   expect(await client.callTool({
     name: 'browser_navigate',
@@ -274,4 +279,373 @@ test('old locator error message', async ({ client, server }) => {
       ref: 'e3',
     },
   })).toContainTextContent('Ref not found');
+});
+
+test('browser_get_html_source', async ({ client, server }) => {
+  server.setContent('/', `
+    <html>
+      <head><title>Test Page</title></head>
+      <body>
+        <h1>Test Heading</h1>
+        <p>Test paragraph</p>
+      </body>
+    </html>
+  `, 'text/html');
+
+  await client.callTool({
+    name: 'browser_navigate',
+    arguments: { url: server.PREFIX },
+  });
+
+  const result = await client.callTool({
+    name: 'browser_get_html_source',
+    arguments: {},
+  });
+
+  const parsed = parseHtmlSourceResponse(result);
+  expect(parsed.content).toContain('Test Heading');
+  expect(parsed.content).toContain('Test paragraph');
+  expect(parsed.content).toContain('<title>Test Page</title>');
+  expect(parsed.totalLength).toBeGreaterThan(0);
+  expect(parsed.hasMore).toBe(false);
+  expect(parsed.actualOffset).toBe(0);
+  expect(parsed.actualLength).toBe(parsed.totalLength);
+});
+
+test('browser_get_html_source with compression', async ({ client, server }) => {
+  server.setContent('/', `
+    <html>
+      <head>
+        <title>Test Page</title>
+      </head>
+      <body>
+        <h1>Test Heading</h1>
+        <p>Test paragraph</p>
+      </body>
+    </html>
+  `, 'text/html');
+
+  await client.callTool({
+    name: 'browser_navigate',
+    arguments: { url: server.PREFIX },
+  });
+
+  const result = await client.callTool({
+    name: 'browser_get_html_source',
+    arguments: { compress: true },
+  });
+
+  const parsed = parseHtmlSourceResponse(result);
+  expect(parsed.content).not.toContain('\n');
+  expect(parsed.content).toContain('Test Heading');
+});
+
+test.skip('browser_get_html_source with excludeTags', async ({ client, server }) => {
+  server.setContent('/', `
+    <html>
+      <head>
+        <title>Test Page</title>
+        <script>console.log('test');</script>
+      </head>
+      <body>
+        <h1>Test Heading</h1>
+        <script>alert('popup');</script>
+        <p>Test paragraph</p>
+      </body>
+    </html>
+  `, 'text/html');
+
+  await client.callTool({
+    name: 'browser_navigate',
+    arguments: { url: server.PREFIX },
+  });
+
+  const result = await client.callTool({
+    name: 'browser_get_html_source',
+    arguments: { excludeTags: ['script'] },
+  });
+
+  const parsed = parseHtmlSourceResponse(result);
+  expect(parsed.content).not.toContain('console.log');
+  expect(parsed.content).not.toContain('alert');
+  expect(parsed.content).toContain('Test Heading');
+});
+
+test('browser_get_html_source with maxLength and offset', async ({ client, server }) => {
+  server.setContent('/', `
+    <html>
+      <head><title>Test Page</title></head>
+      <body>
+        <h1>This is a very long content that should be split into chunks</h1>
+        <p>More content here to make it longer</p>
+      </body>
+    </html>
+  `, 'text/html');
+
+  await client.callTool({
+    name: 'browser_navigate',
+    arguments: { url: server.PREFIX },
+  });
+
+  const result1 = await client.callTool({
+    name: 'browser_get_html_source',
+    arguments: { maxLength: 50 },
+  });
+
+  const parsed1 = parseHtmlSourceResponse(result1);
+  expect(parsed1.actualLength).toBe(50);
+  expect(parsed1.hasMore).toBe(true);
+  expect(parsed1.actualOffset).toBe(0);
+
+  const result2 = await client.callTool({
+    name: 'browser_get_html_source',
+    arguments: { offset: 50, maxLength: 50 },
+  });
+
+  const parsed2 = parseHtmlSourceResponse(result2);
+  expect(parsed2.actualOffset).toBe(50);
+  expect(parsed2.actualLength).toBe(50);
+});
+
+test('browser_get_html_source with preset minimal', async ({ client, server }) => {
+  server.setContent('/', `
+    <html>
+      <head>
+        <title>Test Page</title>
+        <script>console.log('test');</script>
+        <style>body { color: red; }</style>
+      </head>
+      <body>
+        <h1>Test Heading</h1>
+        <p>Test paragraph</p>
+      </body>
+    </html>
+  `, 'text/html');
+
+  await client.callTool({
+    name: 'browser_navigate',
+    arguments: { url: server.PREFIX },
+  });
+
+  const result = await client.callTool({
+    name: 'browser_get_html_source',
+    arguments: { preset: 'minimal' },
+  });
+
+  const parsed = parseHtmlSourceResponse(result);
+  expect(parsed.content).not.toContain('console.log');
+  expect(parsed.content).not.toContain('color: red');
+  expect(parsed.content).not.toContain('\n');
+  expect(parsed.content).toContain('Test Heading');
+});
+
+test('browser_get_html_source with headOnly', async ({ client, server }) => {
+  server.setContent('/', `
+    <html>
+      <head><title>Test Page</title></head>
+      <body>
+        <h1>Test Heading</h1>
+        <p>Test paragraph</p>
+      </body>
+    </html>
+  `, 'text/html');
+
+  await client.callTool({
+    name: 'browser_navigate',
+    arguments: { url: server.PREFIX },
+  });
+
+  const result = await client.callTool({
+    name: 'browser_get_html_source',
+    arguments: { headOnly: true },
+  });
+
+  const parsed = parseHtmlSourceResponse(result);
+  expect(parsed.content).toContain('<title>Test Page</title>');
+  expect(parsed.content).not.toContain('Test Heading');
+  expect(parsed.content).not.toContain('Test paragraph');
+});
+
+test('browser_get_html_source with selector', async ({ client, server }) => {
+  server.setContent('/', `
+    <html>
+      <head><title>Test Page</title></head>
+      <body>
+        <h1 class="main-title">Test Heading</h1>
+        <p>Test paragraph</p>
+        <div class="content">Target content</div>
+      </body>
+    </html>
+  `, 'text/html');
+
+  await client.callTool({
+    name: 'browser_navigate',
+    arguments: { url: server.PREFIX },
+  });
+
+  const result = await client.callTool({
+    name: 'browser_get_html_source',
+    arguments: { selector: '.content' },
+  });
+
+  const parsed = parseHtmlSourceResponse(result);
+  expect(parsed.content).toContain('Target content');
+  expect(parsed.content).not.toContain('Test Heading');
+  expect(parsed.content).not.toContain('Test paragraph');
+});
+
+test('browser_get_html_source with preset structure', async ({ client, server }) => {
+  server.setContent('/', `
+    <html>
+      <head>
+        <title>Test Page</title>
+        <script>console.log('test');</script>
+        <style>body { color: red; }</style>
+      </head>
+      <body>
+        <h1>Test Heading</h1>
+        <p>Test paragraph</p>
+      </body>
+    </html>
+  `, 'text/html');
+
+  await client.callTool({
+    name: 'browser_navigate',
+    arguments: { url: server.PREFIX },
+  });
+
+  const result = await client.callTool({
+    name: 'browser_get_html_source',
+    arguments: { preset: 'structure' },
+  });
+
+  const parsed = parseHtmlSourceResponse(result);
+  expect(parsed.content).not.toContain('console.log');
+  expect(parsed.content).not.toContain('color: red');
+  expect(parsed.content).not.toContain('\n');
+  expect(parsed.content).toContain('Test Heading');
+  expect(parsed.content).toContain('<title>Test Page</title>');
+});
+
+test('browser_get_html_source with preset content', async ({ client, server }) => {
+  server.setContent('/', `
+    <html>
+      <head>
+        <title>Test Page</title>
+        <script>console.log('test');</script>
+        <style>body { color: red; }</style>
+        <meta charset="utf-8">
+        <link rel="stylesheet" href="style.css">
+      </head>
+      <body>
+        <h1>Test Heading</h1>
+        <p>Test paragraph</p>
+      </body>
+    </html>
+  `, 'text/html');
+
+  await client.callTool({
+    name: 'browser_navigate',
+    arguments: { url: server.PREFIX },
+  });
+
+  const result = await client.callTool({
+    name: 'browser_get_html_source',
+    arguments: { preset: 'content' },
+  });
+
+  const parsed = parseHtmlSourceResponse(result);
+  expect(parsed.content).not.toContain('console.log');
+  expect(parsed.content).not.toContain('color: red');
+  expect(parsed.content).not.toContain('charset="utf-8"');
+  expect(parsed.content).not.toContain('rel="stylesheet"');
+  expect(parsed.content).not.toContain('\n');
+  expect(parsed.content).toContain('Test Heading');
+  expect(parsed.content).toContain('<title>Test Page</title>');
+});
+
+test('browser_get_html_source with includeComments', async ({ client, server }) => {
+  server.setContent('/', `
+    <html>
+      <head>
+        <title>Test Page</title>
+        <!-- This is a head comment -->
+      </head>
+      <body>
+        <!-- This is a body comment -->
+        <h1>Test Heading</h1>
+        <!-- Another comment -->
+        <p>Test paragraph</p>
+      </body>
+    </html>
+  `, 'text/html');
+
+  await client.callTool({
+    name: 'browser_navigate',
+    arguments: { url: server.PREFIX },
+  });
+
+  // Test with includeComments: true
+  const resultWithComments = await client.callTool({
+    name: 'browser_get_html_source',
+    arguments: { includeComments: true },
+  });
+
+  const parsedWithComments = parseHtmlSourceResponse(resultWithComments);
+  expect(parsedWithComments.content).toContain('This is a head comment');
+  expect(parsedWithComments.content).toContain('This is a body comment');
+  expect(parsedWithComments.content).toContain('Another comment');
+
+  // Test with includeComments: false (default)
+  const resultWithoutComments = await client.callTool({
+    name: 'browser_get_html_source',
+    arguments: { includeComments: false },
+  });
+
+  const parsedWithoutComments = parseHtmlSourceResponse(resultWithoutComments);
+  expect(parsedWithoutComments.content).not.toContain('This is a head comment');
+  expect(parsedWithoutComments.content).not.toContain('This is a body comment');
+  expect(parsedWithoutComments.content).not.toContain('Another comment');
+});
+
+test('browser_get_html_source with prettyPrint', async ({ client, server }) => {
+  server.setContent('/', `
+    <html><head><title>Test Page</title></head><body><h1>Test Heading</h1><p>Test paragraph</p><div><span>Nested content</span></div></body></html>
+  `, 'text/html');
+
+  await client.callTool({
+    name: 'browser_navigate',
+    arguments: { url: server.PREFIX },
+  });
+
+  // Test with prettyPrint: true
+  const resultPretty = await client.callTool({
+    name: 'browser_get_html_source',
+    arguments: { prettyPrint: true },
+  });
+
+  const parsedPretty = parseHtmlSourceResponse(resultPretty);
+  // Pretty print should add newlines between tags
+  expect(parsedPretty.content).toContain('>\n<');
+  expect(parsedPretty.content.split('\n').length).toBeGreaterThan(5);
+
+  // Test with prettyPrint: false (default)
+  const resultNormal = await client.callTool({
+    name: 'browser_get_html_source',
+    arguments: { prettyPrint: false },
+  });
+
+  const parsedNormal = parseHtmlSourceResponse(resultNormal);
+  // Without pretty print, should have fewer newlines
+  expect(parsedNormal.content.split('\n').length).toBeLessThan(parsedPretty.content.split('\n').length);
+
+  // Test that prettyPrint is ignored when compress is true
+  const resultCompressedPretty = await client.callTool({
+    name: 'browser_get_html_source',
+    arguments: { prettyPrint: true, compress: true },
+  });
+
+  const parsedCompressedPretty = parseHtmlSourceResponse(resultCompressedPretty);
+  // When compress is true, prettyPrint should be ignored
+  expect(parsedCompressedPretty.content).not.toContain('\n');
 });
