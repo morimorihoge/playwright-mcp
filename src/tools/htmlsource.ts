@@ -182,7 +182,7 @@ const getHtmlSource: ToolFactory = captureSnapshot => defineTool({
     if (finalParams.excludeTags && finalParams.excludeTags.length > 0) {
       code.push(`// Remove excluded tags: ${finalParams.excludeTags.join(', ')}`);
       for (const tag of finalParams.excludeTags) {
-        code.push(`await page.evaluate(() => document.querySelectorAll('${tag}').forEach(el => el.remove()));`);
+        code.push(`await page.evaluate((tagName) => document.querySelectorAll(tagName).forEach(el => el.remove()), '${tag}');`);
       }
     }
     

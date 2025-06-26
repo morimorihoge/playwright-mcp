@@ -17,7 +17,7 @@
 import { test, expect } from './fixtures.js';
 
 // Helper function to parse HTML source tool result
-function parseHtmlSourceResult(result: any) {
+function parseHtmlSourceResponse(result: any) {
   return JSON.parse((result.content as any)[0].text);
 }
 
@@ -302,7 +302,7 @@ test('browser_get_html_source', async ({ client, server }) => {
     arguments: {},
   });
 
-  const parsed = parseHtmlSourceResult(result);
+  const parsed = parseHtmlSourceResponse(result);
   expect(parsed.content).toContain('Test Heading');
   expect(parsed.content).toContain('Test paragraph');
   expect(parsed.content).toContain('<title>Test Page</title>');
@@ -335,7 +335,7 @@ test('browser_get_html_source with compression', async ({ client, server }) => {
     arguments: { compress: true },
   });
 
-  const parsed = parseHtmlSourceResult(result);
+  const parsed = parseHtmlSourceResponse(result);
   expect(parsed.content).not.toContain('\n');
   expect(parsed.content).toContain('Test Heading');
 });
@@ -365,7 +365,7 @@ test.skip('browser_get_html_source with excludeTags', async ({ client, server })
     arguments: { excludeTags: ['script'] },
   });
 
-  const parsed = parseHtmlSourceResult(result);
+  const parsed = parseHtmlSourceResponse(result);
   expect(parsed.content).not.toContain('console.log');
   expect(parsed.content).not.toContain('alert');
   expect(parsed.content).toContain('Test Heading');
@@ -392,7 +392,7 @@ test('browser_get_html_source with maxLength and offset', async ({ client, serve
     arguments: { maxLength: 50 },
   });
 
-  const parsed1 = parseHtmlSourceResult(result1);
+  const parsed1 = parseHtmlSourceResponse(result1);
   expect(parsed1.actualLength).toBe(50);
   expect(parsed1.hasMore).toBe(true);
   expect(parsed1.actualOffset).toBe(0);
@@ -402,7 +402,7 @@ test('browser_get_html_source with maxLength and offset', async ({ client, serve
     arguments: { offset: 50, maxLength: 50 },
   });
 
-  const parsed2 = parseHtmlSourceResult(result2);
+  const parsed2 = parseHtmlSourceResponse(result2);
   expect(parsed2.actualOffset).toBe(50);
   expect(parsed2.actualLength).toBe(50);
 });
@@ -432,7 +432,7 @@ test('browser_get_html_source with preset minimal', async ({ client, server }) =
     arguments: { preset: 'minimal' },
   });
 
-  const parsed = parseHtmlSourceResult(result);
+  const parsed = parseHtmlSourceResponse(result);
   expect(parsed.content).not.toContain('console.log');
   expect(parsed.content).not.toContain('color: red');
   expect(parsed.content).not.toContain('\n');
@@ -460,7 +460,7 @@ test('browser_get_html_source with headOnly', async ({ client, server }) => {
     arguments: { headOnly: true },
   });
 
-  const parsed = parseHtmlSourceResult(result);
+  const parsed = parseHtmlSourceResponse(result);
   expect(parsed.content).toContain('<title>Test Page</title>');
   expect(parsed.content).not.toContain('Test Heading');
   expect(parsed.content).not.toContain('Test paragraph');
@@ -488,7 +488,7 @@ test('browser_get_html_source with selector', async ({ client, server }) => {
     arguments: { selector: '.content' },
   });
 
-  const parsed = parseHtmlSourceResult(result);
+  const parsed = parseHtmlSourceResponse(result);
   expect(parsed.content).toContain('Target content');
   expect(parsed.content).not.toContain('Test Heading');
   expect(parsed.content).not.toContain('Test paragraph');
@@ -519,7 +519,7 @@ test('browser_get_html_source with preset structure', async ({ client, server })
     arguments: { preset: 'structure' },
   });
 
-  const parsed = parseHtmlSourceResult(result);
+  const parsed = parseHtmlSourceResponse(result);
   expect(parsed.content).not.toContain('console.log');
   expect(parsed.content).not.toContain('color: red');
   expect(parsed.content).not.toContain('\n');
@@ -554,7 +554,7 @@ test('browser_get_html_source with preset content', async ({ client, server }) =
     arguments: { preset: 'content' },
   });
 
-  const parsed = parseHtmlSourceResult(result);
+  const parsed = parseHtmlSourceResponse(result);
   expect(parsed.content).not.toContain('console.log');
   expect(parsed.content).not.toContain('color: red');
   expect(parsed.content).not.toContain('charset="utf-8"');
@@ -591,7 +591,7 @@ test('browser_get_html_source with includeComments', async ({ client, server }) 
     arguments: { includeComments: true },
   });
 
-  const parsedWithComments = parseHtmlSourceResult(resultWithComments);
+  const parsedWithComments = parseHtmlSourceResponse(resultWithComments);
   expect(parsedWithComments.content).toContain('This is a head comment');
   expect(parsedWithComments.content).toContain('This is a body comment');
   expect(parsedWithComments.content).toContain('Another comment');
@@ -602,7 +602,7 @@ test('browser_get_html_source with includeComments', async ({ client, server }) 
     arguments: { includeComments: false },
   });
 
-  const parsedWithoutComments = parseHtmlSourceResult(resultWithoutComments);
+  const parsedWithoutComments = parseHtmlSourceResponse(resultWithoutComments);
   expect(parsedWithoutComments.content).not.toContain('This is a head comment');
   expect(parsedWithoutComments.content).not.toContain('This is a body comment');
   expect(parsedWithoutComments.content).not.toContain('Another comment');
@@ -624,7 +624,7 @@ test('browser_get_html_source with prettyPrint', async ({ client, server }) => {
     arguments: { prettyPrint: true },
   });
 
-  const parsedPretty = parseHtmlSourceResult(resultPretty);
+  const parsedPretty = parseHtmlSourceResponse(resultPretty);
   // Pretty print should add newlines between tags
   expect(parsedPretty.content).toContain('>\n<');
   expect(parsedPretty.content.split('\n').length).toBeGreaterThan(5);
@@ -635,7 +635,7 @@ test('browser_get_html_source with prettyPrint', async ({ client, server }) => {
     arguments: { prettyPrint: false },
   });
 
-  const parsedNormal = parseHtmlSourceResult(resultNormal);
+  const parsedNormal = parseHtmlSourceResponse(resultNormal);
   // Without pretty print, should have fewer newlines
   expect(parsedNormal.content.split('\n').length).toBeLessThan(parsedPretty.content.split('\n').length);
 
@@ -645,7 +645,7 @@ test('browser_get_html_source with prettyPrint', async ({ client, server }) => {
     arguments: { prettyPrint: true, compress: true },
   });
 
-  const parsedCompressedPretty = parseHtmlSourceResult(resultCompressedPretty);
+  const parsedCompressedPretty = parseHtmlSourceResponse(resultCompressedPretty);
   // When compress is true, prettyPrint should be ignored
   expect(parsedCompressedPretty.content).not.toContain('\n');
 });
