@@ -16,6 +16,11 @@
 
 import { test, expect } from './fixtures.js';
 
+// Helper function to parse HTML source tool result
+function parseHtmlSourceResult(result: any) {
+  return JSON.parse((result.content as any)[0].text);
+}
+
 test('browser_navigate', async ({ client, server }) => {
   expect(await client.callTool({
     name: 'browser_navigate',
@@ -327,7 +332,7 @@ test('browser_get_html_source with compression', async ({ client, server }) => {
     arguments: { compress: true },
   });
 
-  const parsed = JSON.parse((result.content as any)[0].text);
+  const parsed = parseHtmlSourceResult(result);
   expect(parsed.content).not.toContain('\n');
   expect(parsed.content).toContain('Test Heading');
 });
@@ -357,15 +362,10 @@ test.skip('browser_get_html_source with excludeTags', async ({ client, server })
     arguments: { excludeTags: ['script'] },
   });
 
-  // Check if result has the expected structure
-  if (result && result.content && Array.isArray(result.content) && result.content[0] && result.content[0].text) {
-    const parsed = JSON.parse(result.content[0].text);
-    expect(parsed.content).not.toContain('console.log');
-    expect(parsed.content).not.toContain('alert');
-    expect(parsed.content).toContain('Test Heading');
-  } else {
-    throw new Error(`Unexpected result format: ${JSON.stringify(result)}`);
-  }
+  const parsed = parseHtmlSourceResult(result);
+  expect(parsed.content).not.toContain('console.log');
+  expect(parsed.content).not.toContain('alert');
+  expect(parsed.content).toContain('Test Heading');
 });
 
 test('browser_get_html_source with maxLength and offset', async ({ client, server }) => {
@@ -389,7 +389,7 @@ test('browser_get_html_source with maxLength and offset', async ({ client, serve
     arguments: { maxLength: 50 },
   });
 
-  const parsed1 = JSON.parse((result1.content as any)[0].text);
+  const parsed1 = parseHtmlSourceResult(result1);
   expect(parsed1.actualLength).toBe(50);
   expect(parsed1.hasMore).toBe(true);
   expect(parsed1.actualOffset).toBe(0);
@@ -399,7 +399,7 @@ test('browser_get_html_source with maxLength and offset', async ({ client, serve
     arguments: { offset: 50, maxLength: 50 },
   });
 
-  const parsed2 = JSON.parse((result2.content as any)[0].text);
+  const parsed2 = parseHtmlSourceResult(result2);
   expect(parsed2.actualOffset).toBe(50);
   expect(parsed2.actualLength).toBe(50);
 });
@@ -429,7 +429,7 @@ test('browser_get_html_source with preset minimal', async ({ client, server }) =
     arguments: { preset: 'minimal' },
   });
 
-  const parsed = JSON.parse((result.content as any)[0].text);
+  const parsed = parseHtmlSourceResult(result);
   expect(parsed.content).not.toContain('console.log');
   expect(parsed.content).not.toContain('color: red');
   expect(parsed.content).not.toContain('\n');
@@ -457,7 +457,7 @@ test('browser_get_html_source with headOnly', async ({ client, server }) => {
     arguments: { headOnly: true },
   });
 
-  const parsed = JSON.parse((result.content as any)[0].text);
+  const parsed = parseHtmlSourceResult(result);
   expect(parsed.content).toContain('<title>Test Page</title>');
   expect(parsed.content).not.toContain('Test Heading');
   expect(parsed.content).not.toContain('Test paragraph');
@@ -485,7 +485,7 @@ test('browser_get_html_source with selector', async ({ client, server }) => {
     arguments: { selector: '.content' },
   });
 
-  const parsed = JSON.parse((result.content as any)[0].text);
+  const parsed = parseHtmlSourceResult(result);
   expect(parsed.content).toContain('Target content');
   expect(parsed.content).not.toContain('Test Heading');
   expect(parsed.content).not.toContain('Test paragraph');

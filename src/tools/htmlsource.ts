@@ -133,7 +133,7 @@ const getHtmlSource: ToolFactory = captureSnapshot => defineTool({
         .trim();
     }
 
-    // Apply pretty printing (after compression to override it)
+    // Apply pretty printing (only if compression is disabled)
     if (finalParams.prettyPrint && !finalParams.compress) {
       // Simple pretty printing - add newlines after tags
       htmlSource = htmlSource
