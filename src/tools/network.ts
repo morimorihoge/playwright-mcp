@@ -202,7 +202,7 @@ function generateCurlCommand(info: any): string {
   }
   
   // POST data
-  if (info.postData) {
+  if (info.postData && Array.isArray(info.postData.params) && info.postData.params.length > 0) {
     if (info.postData.params[0].name === 'raw') {
       parts.push('-d', `'${info.postData.params[0].value}'`);
     } else {

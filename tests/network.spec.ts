@@ -97,8 +97,15 @@ test('browser_get_request_info - with cookies', async ({ client, server }) => {
     },
   });
 
-  // Wait for cookies to be set
-  await new Promise(resolve => setTimeout(resolve, 500));
+  // Wait for cookies to be set reliably
+  await expect.poll(async () => {
+    const response = await client.callTool({
+      name: 'browser_get_request_info',
+      arguments: {},
+    });
+    const result = JSON.parse(response.content[0].text);
+    return result.cookies.length > 0;
+  }).toBe(true);
 
   const response = await client.callTool({
     name: 'browser_get_request_info',
