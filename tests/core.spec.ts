@@ -563,3 +563,89 @@ test('browser_get_html_source with preset content', async ({ client, server }) =
   expect(parsed.content).toContain('Test Heading');
   expect(parsed.content).toContain('<title>Test Page</title>');
 });
+
+test('browser_get_html_source with includeComments', async ({ client, server }) => {
+  server.setContent('/', `
+    <html>
+      <head>
+        <title>Test Page</title>
+        <!-- This is a head comment -->
+      </head>
+      <body>
+        <!-- This is a body comment -->
+        <h1>Test Heading</h1>
+        <!-- Another comment -->
+        <p>Test paragraph</p>
+      </body>
+    </html>
+  `, 'text/html');
+
+  await client.callTool({
+    name: 'browser_navigate',
+    arguments: { url: server.PREFIX },
+  });
+
+  // Test with includeComments: true
+  const resultWithComments = await client.callTool({
+    name: 'browser_get_html_source',
+    arguments: { includeComments: true },
+  });
+
+  const parsedWithComments = parseHtmlSourceResult(resultWithComments);
+  expect(parsedWithComments.content).toContain('This is a head comment');
+  expect(parsedWithComments.content).toContain('This is a body comment');
+  expect(parsedWithComments.content).toContain('Another comment');
+
+  // Test with includeComments: false (default)
+  const resultWithoutComments = await client.callTool({
+    name: 'browser_get_html_source',
+    arguments: { includeComments: false },
+  });
+
+  const parsedWithoutComments = parseHtmlSourceResult(resultWithoutComments);
+  expect(parsedWithoutComments.content).not.toContain('This is a head comment');
+  expect(parsedWithoutComments.content).not.toContain('This is a body comment');
+  expect(parsedWithoutComments.content).not.toContain('Another comment');
+});
+
+test('browser_get_html_source with prettyPrint', async ({ client, server }) => {
+  server.setContent('/', `
+    <html><head><title>Test Page</title></head><body><h1>Test Heading</h1><p>Test paragraph</p><div><span>Nested content</span></div></body></html>
+  `, 'text/html');
+
+  await client.callTool({
+    name: 'browser_navigate',
+    arguments: { url: server.PREFIX },
+  });
+
+  // Test with prettyPrint: true
+  const resultPretty = await client.callTool({
+    name: 'browser_get_html_source',
+    arguments: { prettyPrint: true },
+  });
+
+  const parsedPretty = parseHtmlSourceResult(resultPretty);
+  // Pretty print should add newlines between tags
+  expect(parsedPretty.content).toContain('>\n<');
+  expect(parsedPretty.content.split('\n').length).toBeGreaterThan(5);
+
+  // Test with prettyPrint: false (default)
+  const resultNormal = await client.callTool({
+    name: 'browser_get_html_source',
+    arguments: { prettyPrint: false },
+  });
+
+  const parsedNormal = parseHtmlSourceResult(resultNormal);
+  // Without pretty print, should have fewer newlines
+  expect(parsedNormal.content.split('\n').length).toBeLessThan(parsedPretty.content.split('\n').length);
+
+  // Test that prettyPrint is ignored when compress is true
+  const resultCompressedPretty = await client.callTool({
+    name: 'browser_get_html_source',
+    arguments: { prettyPrint: true, compress: true },
+  });
+
+  const parsedCompressedPretty = parseHtmlSourceResult(resultCompressedPretty);
+  // When compress is true, prettyPrint should be ignored
+  expect(parsedCompressedPretty.content).not.toContain('\n');
+});

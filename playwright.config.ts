@@ -25,6 +25,8 @@ export default defineConfig<TestOptions>({
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
   reporter: 'list',
+  // Increased timeout to 60s to accommodate browser_get_html_source tests
+  // which may involve complex DOM operations and multiple page evaluations
   timeout: 60000,
   projects: [
     { name: 'chrome' },
