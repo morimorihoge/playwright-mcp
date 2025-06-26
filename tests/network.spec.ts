@@ -43,3 +43,102 @@ test('browser_network_requests', async ({ client, server }) => {
   })).toHaveTextContent(`[GET] ${`${server.PREFIX}`} => [200] OK
 [GET] ${`${server.PREFIX}json`} => [200] OK`);
 });
+
+test('browser_get_request_info - GET request', async ({ client, server }) => {
+  server.setContent('/', `
+    <h1>Test Page</h1>
+  `, 'text/html');
+
+  await client.callTool({
+    name: 'browser_navigate',
+    arguments: {
+      url: server.PREFIX,
+    },
+  });
+
+  const response = await client.callTool({
+    name: 'browser_get_request_info',
+    arguments: {},
+  });
+
+
+  const result = JSON.parse(response.content[0].text);
+  expect(result.url).toBe(server.PREFIX);
+  expect(result.method).toBe('GET');
+  expect(result.timestamp).toBeTruthy();
+  expect(result.curlCommand).toContain('curl');
+  expect(result.curlCommand).toContain(server.PREFIX);
+});
+
+test('browser_get_request_info - with cookies', async ({ client, server }) => {
+  // First navigate to set domain
+  server.setContent('/', `<h1>Test Page</h1>`, 'text/html');
+  
+  await client.callTool({
+    name: 'browser_navigate',
+    arguments: {
+      url: server.PREFIX,
+    },
+  });
+
+  // Now set cookies via JavaScript
+  server.setContent('/set-cookies', `
+    <h1>Cookie Test</h1>
+    <script>
+      document.cookie = "session_id=abc123; path=/";
+      document.cookie = "user_pref=dark; path=/";
+    </script>
+  `, 'text/html');
+
+  await client.callTool({
+    name: 'browser_navigate',
+    arguments: {
+      url: `${server.PREFIX}set-cookies`,
+    },
+  });
+
+  // Wait for cookies to be set reliably
+  await expect.poll(async () => {
+    const response = await client.callTool({
+      name: 'browser_get_request_info',
+      arguments: {},
+    });
+    const result = JSON.parse(response.content[0].text);
+    return result.cookies.length > 0;
+  }).toBe(true);
+
+  const response = await client.callTool({
+    name: 'browser_get_request_info',
+    arguments: {},
+  });
+
+  const result = JSON.parse(response.content[0].text);
+  expect(result.cookies.length).toBeGreaterThan(0);
+  expect(result.curlCommand).toContain('-H \'Cookie:');
+  expect(result.curlCommand).toContain('session_id=abc123');
+});
+
+test('browser_get_request_info - reload option', async ({ client, server }) => {
+  server.setContent('/', `
+    <h1>Test Page</h1>
+  `, 'text/html');
+
+  await client.callTool({
+    name: 'browser_navigate',
+    arguments: {
+      url: server.PREFIX,
+    },
+  });
+
+  const response = await client.callTool({
+    name: 'browser_get_request_info',
+    arguments: {
+      reload: true,
+    },
+  });
+
+  const result = JSON.parse(response.content[0].text);
+  expect(result.url).toBe(server.PREFIX);
+  expect(result.method).toBe('GET');
+  expect(result.headers).toBeDefined();
+});
