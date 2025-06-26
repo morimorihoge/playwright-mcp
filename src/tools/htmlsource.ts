@@ -175,10 +175,41 @@ const getHtmlSource: ToolFactory = captureSnapshot => defineTool({
       actualLength,
     };
 
-    const code = [
-      '// Get HTML source of the current page',
-      'await page.content();',
-    ];
+    // Build code snippet reflecting actual operations performed
+    const code = ['// Get HTML source of the current page'];
+    
+    // Add tag exclusion if used
+    if (finalParams.excludeTags && finalParams.excludeTags.length > 0) {
+      code.push(`// Remove excluded tags: ${finalParams.excludeTags.join(', ')}`);
+      for (const tag of finalParams.excludeTags) {
+        code.push(`await page.evaluate(() => document.querySelectorAll('${tag}').forEach(el => el.remove()));`);
+      }
+    }
+    
+    // Add selector filtering if used
+    if (finalParams.selector) {
+      code.push(`// Get content from selector: ${finalParams.selector}`);
+      code.push(`await page.$$eval('${finalParams.selector}', els => els.map(el => el.outerHTML).join('\\n'));`);
+    } else if (finalParams.headOnly) {
+      code.push('// Get head section only');
+      code.push(`await page.$eval('head', el => el.outerHTML);`);
+    } else if (finalParams.bodyOnly) {
+      code.push('// Get body section only');
+      code.push(`await page.$eval('body', el => el.outerHTML);`);
+    } else {
+      code.push('await page.content();');
+    }
+    
+    // Add post-processing notes
+    if (finalParams.compress) {
+      code.push('// Then minify HTML (remove whitespace)');
+    }
+    if (finalParams.prettyPrint && !finalParams.compress) {
+      code.push('// Then format with proper indentation');
+    }
+    if (finalParams.maxLength) {
+      code.push(`// Then apply pagination (offset: ${finalParams.offset || 0}, maxLength: ${finalParams.maxLength})`);
+    }
 
     return {
       code,
