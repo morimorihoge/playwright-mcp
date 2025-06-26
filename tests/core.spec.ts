@@ -493,3 +493,73 @@ test('browser_get_html_source with selector', async ({ client, server }) => {
   expect(parsed.content).not.toContain('Test Heading');
   expect(parsed.content).not.toContain('Test paragraph');
 });
+
+test('browser_get_html_source with preset structure', async ({ client, server }) => {
+  server.setContent('/', `
+    <html>
+      <head>
+        <title>Test Page</title>
+        <script>console.log('test');</script>
+        <style>body { color: red; }</style>
+      </head>
+      <body>
+        <h1>Test Heading</h1>
+        <p>Test paragraph</p>
+      </body>
+    </html>
+  `, 'text/html');
+
+  await client.callTool({
+    name: 'browser_navigate',
+    arguments: { url: server.PREFIX },
+  });
+
+  const result = await client.callTool({
+    name: 'browser_get_html_source',
+    arguments: { preset: 'structure' },
+  });
+
+  const parsed = parseHtmlSourceResult(result);
+  expect(parsed.content).not.toContain('console.log');
+  expect(parsed.content).not.toContain('color: red');
+  expect(parsed.content).not.toContain('\n');
+  expect(parsed.content).toContain('Test Heading');
+  expect(parsed.content).toContain('<title>Test Page</title>');
+});
+
+test('browser_get_html_source with preset content', async ({ client, server }) => {
+  server.setContent('/', `
+    <html>
+      <head>
+        <title>Test Page</title>
+        <script>console.log('test');</script>
+        <style>body { color: red; }</style>
+        <meta charset="utf-8">
+        <link rel="stylesheet" href="style.css">
+      </head>
+      <body>
+        <h1>Test Heading</h1>
+        <p>Test paragraph</p>
+      </body>
+    </html>
+  `, 'text/html');
+
+  await client.callTool({
+    name: 'browser_navigate',
+    arguments: { url: server.PREFIX },
+  });
+
+  const result = await client.callTool({
+    name: 'browser_get_html_source',
+    arguments: { preset: 'content' },
+  });
+
+  const parsed = parseHtmlSourceResult(result);
+  expect(parsed.content).not.toContain('console.log');
+  expect(parsed.content).not.toContain('color: red');
+  expect(parsed.content).not.toContain('charset="utf-8"');
+  expect(parsed.content).not.toContain('rel="stylesheet"');
+  expect(parsed.content).not.toContain('\n');
+  expect(parsed.content).toContain('Test Heading');
+  expect(parsed.content).toContain('<title>Test Page</title>');
+});

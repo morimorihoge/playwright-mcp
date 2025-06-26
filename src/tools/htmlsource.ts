@@ -46,6 +46,11 @@ const getHtmlSource: ToolFactory = captureSnapshot => defineTool({
       
       // Preset combinations
       preset: z.enum(['full', 'minimal', 'structure', 'content']).optional().describe('Predefined option combinations'),
+    }).refine(data => {
+      // Ensure headOnly and bodyOnly are mutually exclusive
+      return !(data.headOnly && data.bodyOnly);
+    }, {
+      message: "headOnly and bodyOnly cannot both be true - they are mutually exclusive",
     }),
     type: 'readOnly',
   },
@@ -82,14 +87,11 @@ const getHtmlSource: ToolFactory = captureSnapshot => defineTool({
     if (finalParams.excludeTags && finalParams.excludeTags.length > 0) {
       for (const tag of finalParams.excludeTags) {
         try {
-          // Use a safer approach with limited scope
-          const removedCount = await tab.page.$$eval(tag, elements => {
-            const count = elements.length;
+          // Use evaluate for safer tag removal
+          await tab.page.evaluate((tagName) => {
+            const elements = document.querySelectorAll(tagName);
             elements.forEach(el => el.remove());
-            return count;
-          });
-          // Optional: log for debugging
-          // console.log(`Removed ${removedCount} <${tag}> elements`);
+          }, tag);
         } catch (error) {
           // Ignore errors for non-existent tags - this is expected behavior
         }
@@ -135,7 +137,7 @@ const getHtmlSource: ToolFactory = captureSnapshot => defineTool({
         .trim();
     }
 
-    // Apply pretty printing (only if compression is disabled)
+    // Apply pretty printing (only if compression is disabled to avoid conflicts)
     if (finalParams.prettyPrint && !finalParams.compress) {
       // Simple pretty printing - add newlines after tags
       htmlSource = htmlSource
