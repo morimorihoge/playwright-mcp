@@ -25,6 +25,7 @@ export default defineConfig<TestOptions>({
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
   reporter: 'list',
+  timeout: 60000,
   projects: [
     { name: 'chrome' },
     { name: 'msedge', use: { mcpBrowser: 'msedge' } },

@@ -52,7 +52,6 @@ const getHtmlSource: ToolFactory = captureSnapshot => defineTool({
 
   handle: async (context, params) => {
     const tab = context.currentTabOrDie();
-    let htmlSource = await tab.page.content();
 
     // Apply preset configurations
     let finalParams = { ...params };
@@ -74,35 +73,50 @@ const getHtmlSource: ToolFactory = captureSnapshot => defineTool({
       }
     }
 
-    // Apply selector filter first
+    // Get initial HTML source
+    let htmlSource = await tab.page.content();
+
+    // Apply DOM manipulation for excluded tags first (most reliable approach)
+    if (finalParams.excludeTags && finalParams.excludeTags.length > 0) {
+      for (const tag of finalParams.excludeTags) {
+        try {
+          // Use a safer approach with limited scope
+          const removedCount = await tab.page.$$eval(tag, elements => {
+            const count = elements.length;
+            elements.forEach(el => el.remove());
+            return count;
+          });
+          // Optional: log for debugging
+          // console.log(`Removed ${removedCount} <${tag}> elements`);
+        } catch (error) {
+          // Ignore errors for non-existent tags - this is expected behavior
+        }
+      }
+      // Get updated content after removing tags
+      htmlSource = await tab.page.content();
+    }
+
+    // Apply selector filter or head/body extraction using DOM operations when possible
     if (finalParams.selector) {
       try {
         const elements = await tab.page.$$eval(finalParams.selector, (els) => 
           els.map(el => el.outerHTML).join('\n')
         );
-        htmlSource = elements;
+        htmlSource = elements || `<!-- Selector "${finalParams.selector}" not found -->`;
       } catch (error) {
         htmlSource = `<!-- Selector "${finalParams.selector}" not found -->`;
       }
-    }
-
-    // Apply head/body only filters
-    if (finalParams.headOnly) {
-      const headMatch = htmlSource.match(/<head[^>]*>([\s\S]*?)<\/head>/i);
-      htmlSource = headMatch ? headMatch[0] : '<!-- No <head> section found -->';
+    } else if (finalParams.headOnly) {
+      try {
+        htmlSource = await tab.page.$eval('head', el => el.outerHTML);
+      } catch (error) {
+        htmlSource = '<!-- No <head> section found -->';
+      }
     } else if (finalParams.bodyOnly) {
-      const bodyMatch = htmlSource.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-      htmlSource = bodyMatch ? bodyMatch[0] : '<!-- No <body> section found -->';
-    }
-
-    // Remove excluded tags
-    if (finalParams.excludeTags && finalParams.excludeTags.length > 0) {
-      for (const tag of finalParams.excludeTags) {
-        const regex = new RegExp(`<${tag}[^>]*>[\\s\\S]*?<\\/${tag}>`, 'gi');
-        htmlSource = htmlSource.replace(regex, '');
-        // Also remove self-closing tags
-        const selfClosingRegex = new RegExp(`<${tag}[^>]*\\/>`, 'gi');
-        htmlSource = htmlSource.replace(selfClosingRegex, '');
+      try {
+        htmlSource = await tab.page.$eval('body', el => el.outerHTML);
+      } catch (error) {
+        htmlSource = '<!-- No <body> section found -->';
       }
     }
 
