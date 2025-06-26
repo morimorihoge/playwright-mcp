@@ -67,6 +67,8 @@ const getHtmlSource: ToolFactory = captureSnapshot => defineTool({
           finalParams = { ...params, excludeTags: ['script', 'style', 'meta', 'link'], compress: true };
           break;
         case 'full':
+          finalParams = { ...params }; // Explicitly retain original parameters
+          break;
         default:
           // Keep original params
           break;
