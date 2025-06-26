@@ -302,11 +302,14 @@ test('browser_get_html_source', async ({ client, server }) => {
     arguments: {},
   });
 
-  expect(result).toContainTextContent('Test Heading');
-  expect(result).toContainTextContent('Test paragraph');
-  expect(result).toContainTextContent('<title>Test Page</title>');
-  expect(result).toContainTextContent('"totalLength"');
-  expect(result).toContainTextContent('"hasMore"');
+  const parsed = parseHtmlSourceResult(result);
+  expect(parsed.content).toContain('Test Heading');
+  expect(parsed.content).toContain('Test paragraph');
+  expect(parsed.content).toContain('<title>Test Page</title>');
+  expect(parsed.totalLength).toBeGreaterThan(0);
+  expect(parsed.hasMore).toBe(false);
+  expect(parsed.actualOffset).toBe(0);
+  expect(parsed.actualLength).toBe(parsed.totalLength);
 });
 
 test('browser_get_html_source with compression', async ({ client, server }) => {
